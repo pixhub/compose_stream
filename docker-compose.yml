@@ -1,0 +1,65 @@
+version: '3'
+
+services:
+  proxy:
+    image: traefik
+    container_name: traefik
+    command: --web --docker --docker.domain=domain.local --logLevel=DEBUG
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /dev/null:/traefik.toml
+    networks:
+      - dmz
+      - frontoffice
+    labels:
+      - "traefik.frontend.rule=Host:traefik.domain.local"
+      - "traefik.backend=traefik"
+      - "traefik.port=8080"
+      - "traefik.docker.network=compose_stream_dmz"
+      
+  web:
+    image: pixhub/docker_nginx-rtmp
+    container_name: web
+    environment:
+      - SERVER_NAME=web.domain.local
+      - STREAM_HOST=web.domain.local
+      - PROTO=http
+    volumes:
+      - stream:/HLS/live
+    networks:
+      - frontoffice
+    links:
+      - stream_app
+    labels:
+      - "traefik.frontend.rule=Host:web.domain.local"
+      - "traefik.backend=web"
+      - "traefik.port=80"
+      - "traefik.docker.network=compose_stream_frontoffice"
+
+  stream_app:
+    image: pixhub/docker_nginx-rtmp
+    container_name: stream_app
+    environment:
+      - SERVER_NAME=stream_app.domain.local
+    volumes:
+      - stream:/HLS/live
+    networks:
+      - frontoffice
+    ports:
+      - "1935:1935"
+    labels:
+      - "traefik.frontend.rule=Host:stream_app.domain.local"
+      - "traefik.backend=stream_app"
+      - "traefik.port=1935"
+      - "traefik.docker.network=compose_stream_frontoffice"
+
+networks:
+  dmz:
+    driver: bridge
+  frontoffice:
+    driver: bridge
+
+volumes:
+  stream: {}
